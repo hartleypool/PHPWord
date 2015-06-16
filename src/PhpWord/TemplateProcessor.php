@@ -59,6 +59,12 @@ class TemplateProcessor
     private $temporaryDocumentFooters = array();
 
     /**
+     * Enable debugging - not for production - will break
+     * @var boolean
+     */
+    private $debugMode = false;
+    
+    /**
      * @since 0.12.0 Throws CreateTemporaryFileException and CopyFileException instead of Exception.
      *
      * @param string $documentTemplate The fully qualified template filename.
@@ -140,6 +146,11 @@ class TemplateProcessor
 
         $this->temporaryDocumentMainPart = $this->setValueForPart($this->temporaryDocumentMainPart, $search, $replace, $limit);
 
+        // check if debugging
+        if ($this->debugMode) {
+            $this->isXML($this->temporaryDocumentMainPart, $search, $replace);
+        }
+        
         foreach ($this->temporaryDocumentFooters as $index => $headerXML) {
             $this->temporaryDocumentFooters[$index] = $this->setValueForPart($this->temporaryDocumentFooters[$index], $search, $replace, $limit);
         }
@@ -568,4 +579,49 @@ class TemplateProcessor
         $this->zipClass->addFile($addPath,'word/media/'.$replaceName);
         return;
     }
+    
+    /**
+     * Enable debugging mode
+     * @param boolean $debug turn on/off debugging
+     * @return void
+     */
+    public function setDebugMode($debug) {
+        $this->debugMode = (boolval($debug));
+    }
+    
+    /**
+     * For debugging, trap errors in the XML and dump.
+     * 
+     * @param string $xml to validate
+     * @param string $search  being replaced
+     * @param string $replace to replace $search with
+     * @return string
+     */
+    function isXML($xml, $search, $replace)
+    {
+        libxml_use_internal_errors(true);
+
+        $doc = new \DOMDocument('1.0', 'utf-8');
+        $doc->loadXML($xml);
+
+        $errors = libxml_get_errors();
+        
+        if (empty($errors)) {
+            return true;
+        }
+
+        $error = $errors[0];
+        if ($error->level < 3) {
+            return true;
+        }
+
+        $explodedxml = explode("r", $xml);
+        $badxml = $explodedxml[($error->line) - 1];
+        echo "\nsearch: $search\n";
+        echo "\nreplace:\n\n$replacement";
+        echo "\nbadXML: $badxml\n";
+        $message = $blockname . "\n\n\n" . $error->message . ' at line ' . $error->line . '. Bad XML: ' . htmlentities($badxml);
+        echo $message;
+        exit;
+    }    
 }
